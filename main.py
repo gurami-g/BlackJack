@@ -10,7 +10,7 @@ pygame.mixer.init(frequency=44100, size=-16, channels=1)
 
 WIDTH, HEIGHT = 1000, 700
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Blackjack - Fixed Deal Issue")
+pygame.display.set_caption("Blackjack - Fixed 4 Player Layout")
 clock = pygame.time.Clock()
 
 SAVE_FILE = "profiles_save_data.json"
@@ -105,7 +105,7 @@ FONT_TITLE = pygame.font.SysFont("Segoe UI", 42, bold=True)
 FONT_LARGE = pygame.font.SysFont("Segoe UI", 28, bold=True)
 FONT_MEDIUM = pygame.font.SysFont("Segoe UI", 16, bold=True)
 FONT_BTN = pygame.font.SysFont("Segoe UI", 14, bold=True)
-FONT_SMALL = pygame.font.SysFont("Segoe UI", 13, bold=True)
+FONT_SMALL = pygame.font.SysFont("Segoe UI", 12, bold=True)
 
 VALUES = [2, 3, 4, 5, 6, 7, 8, 9, 10, "J", "Q", "K", "A"]
 SUITS = ["♠", "♥", "♦", "♣"]
@@ -238,14 +238,14 @@ class ChipButton:
 
 
 def draw_card(surface, x, y, card, hidden=False):
-    rect = pygame.Rect(x, y, 65, 95)
+    rect = pygame.Rect(x, y, 60, 88)
     pygame.draw.rect(surface, SHADOW, rect.move(2, 3), border_radius=6)
 
     if hidden:
         pygame.draw.rect(surface, RED_BTN, rect, border_radius=6)
         pygame.draw.rect(surface, GOLD, rect, 2, border_radius=6)
         pygame.draw.rect(
-            surface, WHITE, (x + 6, y + 6, 53, 83), 1, border_radius=4
+            surface, WHITE, (x + 5, y + 5, 50, 78), 1, border_radius=4
         )
     else:
         pygame.draw.rect(surface, WHITE, rect, border_radius=6)
@@ -256,10 +256,10 @@ def draw_card(surface, x, y, card, hidden=False):
         color = RED_SUIT if suit in ["♥", "♦"] else BLACK
 
         val_surf = FONT_MEDIUM.render(val_str, True, color)
-        surface.blit(val_surf, (x + 5, y + 3))
+        surface.blit(val_surf, (x + 4, y + 2))
 
         suit_surf = FONT_LARGE.render(suit, True, color)
-        suit_rect = suit_surf.get_rect(center=(x + 32, y + 48))
+        suit_rect = suit_surf.get_rect(center=(x + 30, y + 44))
         surface.blit(suit_surf, suit_rect)
 
 
@@ -402,6 +402,14 @@ class ProCasinoBlackjack:
         if self.xp >= self.level * 100:
             self.level += 1
 
+    def update_split_names(self):
+        human_hands = [p for p in self.players if not p["is_bot"]]
+        if len(human_hands) > 1:
+            for idx, p in enumerate(human_hands, 1):
+                p["display_name"] = f"{self.current_profile_name} #{idx}"
+        elif len(human_hands) == 1:
+            human_hands[0]["display_name"] = self.current_profile_name
+
     def reset_game(self):
         self.bet = 0
         self.side_bet_pairs = 0
@@ -436,6 +444,7 @@ class ProCasinoBlackjack:
             self.players.append(
                 {
                     "name": name,
+                    "display_name": name,
                     "style": style,
                     "is_bot": i > 0,
                     "balance": bal if bal > 0 else 1000,
@@ -448,24 +457,24 @@ class ProCasinoBlackjack:
         self.active_player_index = 0
 
         self.chips = [
-    ChipButton(150, 600, 22, 10, (200, 50, 50)),     # 10 (წითელი)
-    ChipButton(205, 600, 22, 25, (40, 140, 60)),    # 25 (მწვანე)
-    ChipButton(260, 600, 22, 50, (50, 100, 200)),    # 50 (ლურჯი)
-    ChipButton(315, 600, 22, 100, (40, 40, 40)),    # 100 (შავი)
-    ChipButton(370, 600, 22, 500, (180, 150, 30)),   # 500 (ოქროსფერი)
-]
+            ChipButton(150, 600, 22, 10, (200, 50, 50)),
+            ChipButton(205, 600, 22, 25, (40, 140, 60)),
+            ChipButton(260, 600, 22, 50, (50, 100, 200)),
+            ChipButton(315, 600, 22, 100, (40, 40, 40)),
+            ChipButton(370, 600, 22, 500, (180, 150, 30)),
+        ]
 
         self.btn_hint = Button(
             840, 20, 120, 38, "რჩევა (AI)", BLUE_BTN, HOVER_BLUE
         )
         self.btn_all_in = Button(
-            390, 580, 100, 42, "ALL-IN", PURPLE_BTN, HOVER_PURPLE
+            410, 580, 90, 42, "ALL-IN", PURPLE_BTN, HOVER_PURPLE
         )
         self.btn_clear_bet = Button(
-            500, 580, 110, 42, "გასუფთავება", DARK_GRAY, HOVER_GRAY
+            510, 580, 110, 42, "გასუფთავება", DARK_GRAY, HOVER_GRAY
         )
         self.btn_deal = Button(
-            620, 580, 110, 42, "დარიგება", RED_BTN, HOVER_RED
+            630, 580, 110, 42, "დარიგება", RED_BTN, HOVER_RED
         )
 
         self.btn_hit = Button(
@@ -537,7 +546,6 @@ class ProCasinoBlackjack:
         else:
             self.message = "თქვენი სვლაა!"
 
-    # 🔧 გასწორებული დარიგების ფუნქცია!
     def start_new_round(self):
         current_bet = self.bet
         sb_pairs = self.side_bet_pairs
@@ -554,7 +562,6 @@ class ProCasinoBlackjack:
             self.message = "არ გაქვთ საკმარისი ბალანსი!"
             return
 
-        # შენახული ფსონების აღდგენა სუფთა რაუნდზე
         self.reset_game()
         self.bet = current_bet
         self.side_bet_pairs = sb_pairs
@@ -601,6 +608,26 @@ class ProCasinoBlackjack:
         self.active_player_index = 0
 
         self.evaluate_side_bets()
+
+        p0_score = calculate_score(p0["hand"])
+        d_score = calculate_score(self.dealer_hand)
+
+        if len(p0["hand"]) == 2 and p0_score == 21:
+            if len(self.dealer_hand) == 2 and d_score == 21:
+                p0["balance"] += self.bet
+                self.message = "ორივეს ბლექჯეკი გაქვთ! ფრე (Push)."
+                self.draws += 1
+            else:
+                win_amount = int(self.bet * 2.5)
+                p0["balance"] += win_amount
+                self.message = f"🎰 ბლექჯეკი! ავტომატური მოგება (+${int(self.bet * 1.5)})!"
+                self.wins += 1
+                self.add_xp(50)
+                SOUND_WIN.play()
+
+            self.state = "GAME_OVER"
+            self.save_game_data()
+            return
 
         self.state = "PLAYING"
 
@@ -692,6 +719,12 @@ class ProCasinoBlackjack:
         if not self.is_human_turn():
             return
 
+        # 🛑 მაქსიმუმ 2 გაყოფა (მაქს 3 ხელი)
+        human_hands = [p for p in self.players if not p["is_bot"]]
+        if len(human_hands) >= 3:
+            self.message = "მიღწეულია გაყოფის ლიმიტი (მაქს. 2 გაყოფა)!"
+            return
+
         curr = self.players[self.active_player_index]
         hand = curr["hand"]
         p0 = self.players[0]
@@ -713,7 +746,8 @@ class ProCasinoBlackjack:
             self.players.insert(
                 self.active_player_index + 1,
                 {
-                    "name": f"{curr['name']} (ხელი 2)",
+                    "name": self.current_profile_name,
+                    "display_name": "",
                     "style": "human",
                     "is_bot": False,
                     "balance": 0,
@@ -722,6 +756,7 @@ class ProCasinoBlackjack:
                     "done": False,
                 },
             )
+            self.update_split_names()
             self.message = "ხელი გაიყო ორად!"
 
     def surrender(self):
@@ -830,9 +865,10 @@ class ProCasinoBlackjack:
             p_score = calculate_score(p["hand"])
             b = p["bet"]
             is_bj = len(p["hand"]) == 2 and p_score == 21
+            disp_name = p.get("display_name", p["name"])
 
             if p_score > 21:
-                summary.append(f"{p['name']}: წააგო")
+                summary.append(f"{disp_name}: წააგო")
                 if not p["is_bot"]:
                     self.losses += 1
             elif d_score > 21 or p_score > d_score:
@@ -843,13 +879,13 @@ class ProCasinoBlackjack:
                     p["balance"] += payout
 
                 win_val = int(b * 1.5) if (is_bj and not d_has_bj) else b
-                summary.append(f"{p['name']}: მოიგო (+${win_val})")
+                summary.append(f"{disp_name}: მოიგო (+${win_val})")
 
                 if not p["is_bot"]:
                     self.wins += 1
                     self.add_xp(50)
             elif p_score < d_score:
-                summary.append(f"{p['name']}: წააგო")
+                summary.append(f"{disp_name}: წააგო")
                 if not p["is_bot"]:
                     self.losses += 1
             else:
@@ -857,7 +893,7 @@ class ProCasinoBlackjack:
                     self.players[0]["balance"] += b
                 else:
                     p["balance"] += b
-                summary.append(f"{p['name']}: ფრე")
+                summary.append(f"{disp_name}: ფრე")
                 if not p["is_bot"]:
                     self.draws += 1
 
@@ -873,12 +909,18 @@ class ProCasinoBlackjack:
         self.message = " | ".join(summary)
 
         self.player_balance = self.players[0]["balance"]
-        self.save_game_data()
 
         if self.players[0]["balance"] <= 0:
             self.state = "BANKRUPT"
-            self.message = "თქვენ გაკოტრდით!"
-        else:
+            self.level = max(0, self.level - 5)
+            self.xp = 0
+            self.message = (
+                f"თქვენ გაკოტრდით! დონე ჩამოვიდა {self.level}-ზე."
+            )
+
+        self.save_game_data()
+
+        if self.state != "BANKRUPT":
             self.state = "GAME_OVER"
 
     def draw(self, surface):
@@ -1016,33 +1058,44 @@ class ProCasinoBlackjack:
 
             for idx, card in enumerate(self.dealer_hand):
                 hidden = idx == 1 and self.state == "PLAYING"
-                draw_card(surface, 50 + idx * 75, 95, card, hidden)
+                draw_card(surface, 50 + idx * 70, 95, card, hidden)
 
             if self.state != "PLAYING" and self.dealer_hand:
                 d_score = calculate_score(self.dealer_hand)
                 d_score_txt = FONT_SMALL.render(
                     f"ქულა: {d_score}", True, WHITE
                 )
-                surface.blit(d_score_txt, (50, 200))
+                surface.blit(d_score_txt, (50, 195))
 
             num_players = len(self.players)
-            spacing = (
-                200 if num_players >= 4 else (230 if num_players == 3 else 280)
-            )
-            card_offset = 25 if num_players >= 4 else 35
+            
+            # 📏 ზუსტი განაწილება 4 მოთამაშის დროს
+            if num_players <= 2:
+                spacing = 320
+                card_offset = 30
+                start_x_base = 150
+            elif num_players == 3:
+                spacing = 270
+                card_offset = 25
+                start_x_base = 100
+            else:  # 4+ მოთამაშე / ხელი
+                spacing = 220
+                card_offset = 22
+                start_x_base = 50
+
             start_y = 275
 
             for h_idx, p in enumerate(self.players):
-                start_x = 50 + h_idx * spacing
+                start_x = start_x_base + h_idx * spacing
 
                 if self.state == "PLAYING" and h_idx == self.active_player_index:
-                    box_width = 100 + (len(p["hand"]) - 1) * card_offset
+                    box_width = 75 + (len(p["hand"]) - 1) * card_offset
                     pygame.draw.rect(
                         surface,
                         GOLD,
-                        (start_x - 6, start_y - 6, box_width, 135),
+                        (start_x - 5, start_y - 5, box_width, 125),
                         2,
-                        border_radius=10,
+                        border_radius=8,
                     )
 
                 for c_idx, card in enumerate(p["hand"]):
@@ -1051,16 +1104,19 @@ class ProCasinoBlackjack:
                     )
 
                 p_score = calculate_score(p["hand"])
-                bal_disp = (
-                    p0["balance"] if not p["is_bot"] else p["balance"]
-                )
+                disp_name = p.get("display_name", p["name"])
+                
                 hand_info = (
-                    f"{p['name']} ({p_score}) | ${bal_disp}"
+                    f"{disp_name} ({p_score})"
                     if self.state != "BETTING"
-                    else f"{p['name']} | ${bal_disp}"
+                    else f"{disp_name}"
                 )
+                
+                # 🎯 ტექსტის ცენტრირება
                 p_score_txt = FONT_SMALL.render(hand_info, True, WHITE)
-                surface.blit(p_score_txt, (start_x, start_y + 105))
+                center_x = start_x + 30 + ((len(p["hand"]) - 1) * card_offset) // 2
+                text_rect = p_score_txt.get_rect(center=(center_x, start_y + 105))
+                surface.blit(p_score_txt, text_rect)
 
             if self.state in ["BETTING", "GAME_OVER"]:
                 for chip in self.chips:
@@ -1112,6 +1168,7 @@ class ProCasinoBlackjack:
                     and get_card_value(curr["hand"][0])
                     == get_card_value(curr["hand"][1])
                     and p0["balance"] >= curr["bet"]
+                    and len([p for p in self.players if not p["is_bot"]]) < 3
                 )
                 can_surrender = is_human and len(curr["hand"]) == 2
                 can_insure = (
@@ -1301,6 +1358,8 @@ def main():
 
                 elif game.state == "BANKRUPT":
                     if game.btn_restart.is_clicked(event):
+                        prof = game.profiles.get(game.current_profile_name, {})
+                        prof["balance"] = 1000
                         game.reset_game()
 
         game.draw(screen)
