@@ -1,0 +1,13 @@
+{
+    "last_active": "გურამი",
+    "profiles": {
+        "გურამი": {
+            "balance": 3250,
+            "xp": 1250,
+            "level": 13,
+            "wins": 15,
+            "losses": 15,
+            "draws": 2
+        }
+    }
+}

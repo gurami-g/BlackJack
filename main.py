@@ -10,10 +10,10 @@ pygame.mixer.init(frequency=44100, size=-16, channels=1)
 
 WIDTH, HEIGHT = 1000, 700
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Blackjack - Fixed Split Hand Turn Management")
+pygame.display.set_caption("Blackjack - Fixed Deal Issue")
 clock = pygame.time.Clock()
 
-SAVE_FILE = "save_data.json"
+SAVE_FILE = "profiles_save_data.json"
 
 
 # 🔊 ხმოვანი ეფექტების გენერატორი
@@ -272,13 +272,10 @@ class ProCasinoBlackjack:
         self.app_state = "MAIN_MENU"
         self.player_count = 1
 
-        self.wins = 0
-        self.losses = 0
-        self.draws = 0
-
-        self.xp = 0
-        self.level = 1
-        self.player_balance = 1000
+        self.profiles = {}
+        self.current_profile_name = "Player 1"
+        self.new_profile_input = ""
+        self.input_active = False
 
         self.shoe = create_shoe(6)
         self.running_count = 0
@@ -290,13 +287,16 @@ class ProCasinoBlackjack:
         self.side_bet_pairs = 0
         self.side_bet_21_3 = 0
 
-        self.load_game_data()
+        self.load_all_profiles()
 
         self.btn_play_ai = Button(
-            350, 260, 300, 55, "კომპიუტერთან თამაში", DARK_GRAY, HOVER_GRAY
+            350, 240, 300, 50, "კომპიუტერთან თამაში", DARK_GRAY, HOVER_GRAY
+        )
+        self.btn_profiles = Button(
+            350, 310, 300, 50, "პროფილის არჩევა", BLUE_BTN, HOVER_BLUE
         )
         self.btn_play_friends = Button(
-            350, 340, 300, 55, "მეგობრებთან თამაში", PURPLE_BTN, HOVER_PURPLE
+            350, 380, 300, 50, "მეგობრებთან თამაში", PURPLE_BTN, HOVER_PURPLE
         )
 
         self.btn_p1 = Button(
@@ -312,7 +312,11 @@ class ProCasinoBlackjack:
             600, 300, 80, 50, "4", DARK_GRAY, HOVER_GRAY
         )
         self.btn_back_to_main = Button(
-            380, 420, 240, 45, "უკან დაბრუნება", RED_BTN, HOVER_RED
+            380, 500, 240, 45, "უკან დაბრუნება", RED_BTN, HOVER_RED
+        )
+
+        self.btn_create_profile = Button(
+            620, 200, 140, 40, "შექმნა", BLUE_BTN, HOVER_BLUE
         )
 
         self.btn_menu = Button(
@@ -321,33 +325,60 @@ class ProCasinoBlackjack:
 
         self.reset_game()
 
-    def save_game_data(self):
-        data = {
-            "balance": self.players[0]["balance"]
-            if hasattr(self, "players")
-            else self.player_balance,
-            "xp": self.xp,
-            "level": self.level,
-            "wins": self.wins,
-            "losses": self.losses,
-            "draws": self.draws,
-        }
-        with open(SAVE_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=4)
-
-    def load_game_data(self):
+    def load_all_profiles(self):
         if os.path.exists(SAVE_FILE):
             try:
                 with open(SAVE_FILE, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                    self.player_balance = data.get("balance", 1000)
-                    self.xp = data.get("xp", 0)
-                    self.level = data.get("level", 1)
-                    self.wins = data.get("wins", 0)
-                    self.losses = data.get("losses", 0)
-                    self.draws = data.get("draws", 0)
+                    self.profiles = data.get("profiles", {})
+                    self.current_profile_name = data.get(
+                        "last_active", "Player 1"
+                    )
             except:
-                self.player_balance = 1000
+                self.profiles = {}
+
+        if not self.profiles:
+            self.profiles["Player 1"] = {
+                "balance": 1000,
+                "xp": 0,
+                "level": 1,
+                "wins": 0,
+                "losses": 0,
+                "draws": 0,
+            }
+            self.current_profile_name = "Player 1"
+
+    def save_game_data(self):
+        curr_prof = self.profiles.get(self.current_profile_name, {})
+        if hasattr(self, "players") and len(self.players) > 0:
+            curr_prof["balance"] = self.players[0]["balance"]
+        curr_prof["xp"] = getattr(self, "xp", curr_prof.get("xp", 0))
+        curr_prof["level"] = getattr(self, "level", curr_prof.get("level", 1))
+        curr_prof["wins"] = getattr(self, "wins", curr_prof.get("wins", 0))
+        curr_prof["losses"] = getattr(
+            self, "losses", curr_prof.get("losses", 0)
+        )
+        curr_prof["draws"] = getattr(self, "draws", curr_prof.get("draws", 0))
+
+        self.profiles[self.current_profile_name] = curr_prof
+
+        data = {
+            "last_active": self.current_profile_name,
+            "profiles": self.profiles,
+        }
+        with open(SAVE_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+
+    def select_profile(self, name):
+        self.save_game_data()
+        self.current_profile_name = name
+        prof = self.profiles[name]
+        self.xp = prof.get("xp", 0)
+        self.level = prof.get("level", 1)
+        self.wins = prof.get("wins", 0)
+        self.losses = prof.get("losses", 0)
+        self.draws = prof.get("draws", 0)
+        self.reset_game()
 
     def update_card_count(self, card):
         v = card["value"]
@@ -381,14 +412,21 @@ class ProCasinoBlackjack:
         self.insurance_taken = False
         self.insurance_amount = 0
 
+        prof = self.profiles.get(self.current_profile_name, {})
+        self.xp = prof.get("xp", 0)
+        self.level = prof.get("level", 1)
+        self.wins = prof.get("wins", 0)
+        self.losses = prof.get("losses", 0)
+        self.draws = prof.get("draws", 0)
+
         self.dealer_hand = []
 
         self.players = []
         for i in range(getattr(self, "player_count", 1)):
             if i == 0:
-                name = "თქვენ"
+                name = self.current_profile_name
                 style = "human"
-                bal = getattr(self, "player_balance", 1000)
+                bal = prof.get("balance", 1000)
             else:
                 profile = BOT_PROFILES[(i - 1) % len(BOT_PROFILES)]
                 name = profile["name"]
@@ -410,11 +448,12 @@ class ProCasinoBlackjack:
         self.active_player_index = 0
 
         self.chips = [
-            ChipButton(180, 600, 22, 10, (200, 50, 50)),
-            ChipButton(235, 600, 22, 50, (50, 100, 200)),
-            ChipButton(290, 600, 22, 100, (40, 40, 40)),
-            ChipButton(345, 600, 22, 500, (180, 150, 30)),
-        ]
+    ChipButton(150, 600, 22, 10, (200, 50, 50)),     # 10 (წითელი)
+    ChipButton(205, 600, 22, 25, (40, 140, 60)),    # 25 (მწვანე)
+    ChipButton(260, 600, 22, 50, (50, 100, 200)),    # 50 (ლურჯი)
+    ChipButton(315, 600, 22, 100, (40, 40, 40)),    # 100 (შავი)
+    ChipButton(370, 600, 22, 500, (180, 150, 30)),   # 500 (ოქროსფერი)
+]
 
         self.btn_hint = Button(
             840, 20, 120, 38, "რჩევა (AI)", BLUE_BTN, HOVER_BLUE
@@ -498,17 +537,30 @@ class ProCasinoBlackjack:
         else:
             self.message = "თქვენი სვლაა!"
 
+    # 🔧 გასწორებული დარიგების ფუნქცია!
     def start_new_round(self):
-        p0 = self.players[0]
-        total_req = self.bet + self.side_bet_pairs + self.side_bet_21_3
+        current_bet = self.bet
+        sb_pairs = self.side_bet_pairs
+        sb_21_3 = self.side_bet_21_3
 
-        if self.bet <= 0:
+        if current_bet <= 0:
             self.message = "გთხოვთ, დადოთ ფსონი!"
             return
+
+        p0 = self.players[0]
+        total_req = current_bet + sb_pairs + sb_21_3
+
         if p0["balance"] < total_req:
             self.message = "არ გაქვთ საკმარისი ბალანსი!"
             return
 
+        # შენახული ფსონების აღდგენა სუფთა რაუნდზე
+        self.reset_game()
+        self.bet = current_bet
+        self.side_bet_pairs = sb_pairs
+        self.side_bet_21_3 = sb_21_3
+
+        p0 = self.players[0]
         SOUND_CARD.play()
         self.hint_text = ""
         self.insurance_taken = False
@@ -658,7 +710,6 @@ class ProCasinoBlackjack:
 
             curr["hand"] = hand1
 
-            # ✂️ ახალი ხელის ჩასმა უშუალოდ მიმდინარე ხელის შემდეგ
             self.players.insert(
                 self.active_player_index + 1,
                 {
@@ -846,11 +897,64 @@ class ProCasinoBlackjack:
 
         if self.app_state == "MAIN_MENU":
             title = FONT_TITLE.render("BLACKJACK CASINO", True, GOLD)
-            title_rect = title.get_rect(center=(WIDTH // 2, 160))
+            title_rect = title.get_rect(center=(WIDTH // 2, 140))
             surface.blit(title, title_rect)
 
+            prof_lbl = FONT_MEDIUM.render(
+                f"პროფილი: {self.current_profile_name}", True, GOLD
+            )
+            prof_rect = prof_lbl.get_rect(center=(WIDTH // 2, 190))
+            surface.blit(prof_lbl, prof_rect)
+
             self.btn_play_ai.draw(surface)
+            self.btn_profiles.draw(surface)
             self.btn_play_friends.draw(surface)
+
+        elif self.app_state == "PROFILE_SELECT":
+            title = FONT_TITLE.render("პროფილების მართვა", True, GOLD)
+            title_rect = title.get_rect(center=(WIDTH // 2, 100))
+            surface.blit(title, title_rect)
+
+            input_box = pygame.Rect(240, 200, 360, 40)
+            box_col = GOLD if self.input_active else WHITE
+            pygame.draw.rect(surface, DARK_GRAY, input_box, border_radius=6)
+            pygame.draw.rect(surface, box_col, input_box, 2, border_radius=6)
+
+            disp_txt = (
+                self.new_profile_input
+                if self.new_profile_input
+                else "შეიყვანეთ სახელი..."
+            )
+            txt_col = WHITE if self.new_profile_input else (150, 150, 150)
+            in_surf = FONT_MEDIUM.render(disp_txt, True, txt_col)
+            surface.blit(in_surf, (input_box.x + 10, input_box.y + 10))
+
+            self.btn_create_profile.draw(surface)
+
+            y_pos = 270
+            self.profile_select_buttons = []
+            self.profile_delete_buttons = []
+
+            for name, prof in self.profiles.items():
+                is_curr = name == self.current_profile_name
+                btn_col = PURPLE_BTN if is_curr else DARK_GRAY
+                btn_txt = f"{name} (${prof.get('balance', 1000)}) - Lvl {prof.get('level', 1)}"
+
+                p_btn = Button(
+                    240, y_pos, 380, 40, btn_txt, btn_col, HOVER_GRAY
+                )
+                d_btn = Button(
+                    630, y_pos, 80, 40, "წაშლა", RED_BTN, HOVER_RED
+                )
+
+                p_btn.draw(surface)
+                d_btn.draw(surface)
+
+                self.profile_select_buttons.append((p_btn, name))
+                self.profile_delete_buttons.append((d_btn, name))
+                y_pos += 50
+
+            self.btn_back_to_main.draw(surface)
 
         elif self.app_state == "PLAYER_SELECT":
             title = FONT_TITLE.render(
@@ -886,6 +990,7 @@ class ProCasinoBlackjack:
             p0 = self.players[0]
 
             stats_txt = (
+                f"პროფილი: {self.current_profile_name}  |  "
                 f"ბალანსი: ${p0['balance']}  |  ფსონი: ${self.bet}  |  "
                 f"Count: {self.running_count}  |  დონე: {self.level}"
             )
@@ -1052,8 +1157,76 @@ def main():
             if game.app_state == "MAIN_MENU":
                 if game.btn_play_ai.is_clicked(event):
                     game.app_state = "PLAYER_SELECT"
+                elif game.btn_profiles.is_clicked(event):
+                    game.app_state = "PROFILE_SELECT"
                 elif game.btn_play_friends.is_clicked(event):
                     game.app_state = "MULTIPLAYER_MENU"
+
+            elif game.app_state == "PROFILE_SELECT":
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    input_box = pygame.Rect(240, 200, 360, 40)
+                    game.input_active = input_box.collidepoint(event.pos)
+
+                elif event.type == pygame.KEYDOWN and game.input_active:
+                    if event.key == pygame.K_RETURN:
+                        if (
+                            game.new_profile_input.strip()
+                            and game.new_profile_input
+                            not in game.profiles
+                        ):
+                            name = game.new_profile_input.strip()
+                            game.profiles[name] = {
+                                "balance": 1000,
+                                "xp": 0,
+                                "level": 1,
+                                "wins": 0,
+                                "losses": 0,
+                                "draws": 0,
+                            }
+                            game.select_profile(name)
+                            game.new_profile_input = ""
+                    elif event.key == pygame.K_BACKSPACE:
+                        game.new_profile_input = game.new_profile_input[:-1]
+                    else:
+                        if len(game.new_profile_input) < 15:
+                            game.new_profile_input += event.unicode
+
+                if game.btn_create_profile.is_clicked(event):
+                    if (
+                        game.new_profile_input.strip()
+                        and game.new_profile_input not in game.profiles
+                    ):
+                        name = game.new_profile_input.strip()
+                        game.profiles[name] = {
+                            "balance": 1000,
+                            "xp": 0,
+                            "level": 1,
+                            "wins": 0,
+                            "losses": 0,
+                            "draws": 0,
+                        }
+                        game.select_profile(name)
+                        game.new_profile_input = ""
+
+                if hasattr(game, "profile_select_buttons"):
+                    for btn, name in game.profile_select_buttons:
+                        if btn.is_clicked(event):
+                            game.select_profile(name)
+
+                if hasattr(game, "profile_delete_buttons"):
+                    for btn, name in game.profile_delete_buttons:
+                        if btn.is_clicked(event):
+                            if len(game.profiles) > 1:
+                                del game.profiles[name]
+                                if game.current_profile_name == name:
+                                    game.select_profile(
+                                        list(game.profiles.keys())[0]
+                                    )
+                                else:
+                                    game.save_game_data()
+
+                if game.btn_back_to_main.is_clicked(event):
+                    game.app_state = "MAIN_MENU"
 
             elif game.app_state == "PLAYER_SELECT":
                 if game.btn_p1.is_clicked(event):
